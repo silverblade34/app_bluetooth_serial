@@ -11,9 +11,10 @@ import 'package:permission_handler/permission_handler.dart';
 
 class HomeController extends GetxController {
   serial.BluetoothConnection? connection;
-  var macAddress = '7C:9E:BD:CF:9C:A6'.obs;
   RxString macAddressPrinter = '66:22:2D:E2:D9:D6'.obs;
   TextEditingController galones = TextEditingController();
+  TextEditingController macElectronica =
+      TextEditingController(text: '7C:9E:BD:CF:9C:A6');
   var isConnected = false.obs;
   var isConnectedPrinter = false.obs;
   thermal.BlueThermalPrinter printer = thermal.BlueThermalPrinter.instance;
@@ -41,18 +42,31 @@ class HomeController extends GetxController {
     }
   }
 
-  printConnect() async {
+  Future<void> printConnect() async {
+    // Desconectar el ESP32 antes de conectarte a la impresora térmica
+    await blsDisconnect();
     if (macAddressPrinter.value.isNotEmpty) {
       try {
         // Buscar el dispositivo con la dirección MAC especificada
         List<thermal.BluetoothDevice> devices =
             await printer.getBondedDevices();
+        print("----------------------------------------");
+        print("Dispositivos vinculados:");
+        for (var device in devices) {
+          print("Nombre: ${device.name}, Dirección MAC: ${device.address}");
+        }
+        print("----------------------------------------");
+
         thermal.BluetoothDevice? device =
             devices.firstWhere((d) => d.address == macAddressPrinter.value);
 
         await printer.connect(device);
         isConnectedPrinter.value = await printer.isConnected ?? false;
+        if (!isConnectedPrinter.value) {
+          Get.snackbar("Error", "No se pudo conectar a la impresora");
+        }
       } catch (e) {
+        print(e.toString());
         Get.snackbar("Error", "No se pudo conectar: $e");
       }
     } else {
@@ -65,16 +79,41 @@ class HomeController extends GetxController {
     isConnectedPrinter.value = false;
   }
 
-  printGalones() async {
-    await printConnect();
-    if (isConnectedPrinter.value) {
-      printer.printNewLine();
-      printer.printCustom("Galones: ${galones.text}", 2, 1);
-      printer.printNewLine();
-      printer.printNewLine();
-      printer.printNewLine();
-    } else {
-      Get.snackbar("Error", "No está conectado a una impresora");
+  Future<void> printGalones() async {
+    try {
+      // Mostrar el indicador de progreso
+      EasyLoading.showProgress(0.0, status: 'Conectando a la impresora...');
+
+      // Conectar a la impresora
+      await printConnect();
+
+      // Actualizar el progreso
+      EasyLoading.showProgress(0.5, status: 'Imprimiendo...');
+
+      if (isConnectedPrinter.value) {
+        printer.printNewLine();
+        printer.printCustom("Galones: ${galones.text}", 2, 1);
+        printer.printNewLine();
+        printer.printNewLine();
+        printer.printNewLine();
+
+        // Actualizar el progreso al 100%
+        EasyLoading.showProgress(1.0, status: 'Finalizando...');
+
+        // Desconectar la impresora después de imprimir
+        await printDisconnect();
+
+        // Ocultar el indicador de progreso
+        EasyLoading.dismiss();
+      } else {
+        // Ocultar el indicador de progreso en caso de error
+        EasyLoading.dismiss();
+        Get.snackbar("Error", "No está conectado a una impresora");
+      }
+    } catch (e) {
+      // Ocultar el indicador de progreso en caso de excepción
+      EasyLoading.dismiss();
+      Get.snackbar("Error", "Se produjo un error: $e");
     }
   }
 
@@ -97,13 +136,14 @@ class HomeController extends GetxController {
         await serial.FlutterBluetoothSerial.instance.requestEnable();
       }
 
-      if (macAddress.value.isEmpty) {
+      if (macElectronica.text.isEmpty) {
         EasyLoading.dismiss();
         throw "La dirección MAC no puede estar vacía.";
       }
 
-      debugPrint("Intentando conectar con MAC: ${macAddress.value}");
-      connection = await serial.BluetoothConnection.toAddress(macAddress.value);
+      debugPrint("Intentando conectar con MAC: ${macElectronica.text}");
+      connection =
+          await serial.BluetoothConnection.toAddress(macElectronica.text);
       EasyLoading.showInfo("BLS CONECTADO");
       isConnected.value = true;
 
@@ -125,9 +165,7 @@ class HomeController extends GetxController {
         isConnected.value = false;
       });
     } catch (err) {
-      EasyLoading.dismiss();
-      debugPrint("Error: $err");
-      EasyLoading.showError("No se pudo vincular al dispositivo: $err");
+      EasyLoading.showError("No se pudo vincular a la electronica");
     }
   }
 

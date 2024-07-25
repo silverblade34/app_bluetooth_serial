@@ -17,35 +17,23 @@ class HomePage extends GetView<HomeController> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Obx(
-                () => TextField(
-                  onChanged: (value) => controller.macAddress.value = value,
-                  decoration: InputDecoration(
-                    labelText: 'Dirección MAC',
-                    border: const OutlineInputBorder(),
-                    errorText: controller.macAddress.value.isEmpty
-                        ? 'La dirección MAC no puede estar vacía'
-                        : null,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: controller.blsConnect,
-                child: const Text('Conectar Bluetooth'),
+                child: const Text('Conectar Electronica'),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: controller.blsDisconnect,
-                child: const Text('Desconectar Bluetooth'),
+                child: const Text('Desconectar Electronica'),
               ),
               const SizedBox(height: 20),
               Obx(
                 () => Text(
                   controller.isConnected.value ? 'Conectado' : 'Desconectado',
                   style: TextStyle(
-                    color:
-                        controller.isConnected.value ? Colors.green : Colors.red,
+                    color: controller.isConnected.value
+                        ? Colors.green
+                        : Colors.red,
                     fontSize: 20,
                   ),
                 ),
